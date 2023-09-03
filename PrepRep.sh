@@ -127,25 +127,31 @@ while true; do
 done
 
 # Get list of all repository names
-response=$(curl -s -H "Authorization: token $TOKEN" "https://api.github.com/users/$USERNAME/repos")
-repos=$(echo $response | jq -r '.[].name')
+page=1
+while :; do
+    response=$(curl -s -H "Authorization: token $TOKEN" "https://api.github.com/users/$USERNAME/repos?per_page=100&page=$page")
+    repos=$(echo $response | jq -r '.[].name')
 
-if [[ $response == *"API rate limit exceeded"* ]]; then
-    echo "API rate limit exceeded. Please try again later."
-    exit 1
-elif [[ $response == *"Bad credentials"* ]]; then
-    echo "Invalid token. Please check your token and try again."
-    exit 1
-elif [[ $repos == "null" ]]; then
-    echo "No repositories found for the given username and token."
-    exit 1
-fi
+    if [[ $response == *"API rate limit exceeded"* ]]; then
+        echo "API rate limit exceeded. Please try again later."
+        exit 1
+    elif [[ $response == *"Bad credentials"* ]]; then
+        echo "Invalid token. Please check your token and try again."
+        exit 1
+    elif [[ $repos == "null" ]]; then
+        break
+    fi
 
-# Clone all repositories
-for repo in $repos
-do
-  git clone "https://github.com/$USERNAME/$repo.git" "$DEST_DIR/$repo"
+    # Clone all repositories
+    for repo in $repos
+    do
+      git clone "https://github.com/$USERNAME/$repo.git" "$DEST_DIR/$repo"
+      if [ $? -ne 0 ]; then
+          echo "Error cloning repository $repo. Continuing with the next one."
+      fi
+    done
+
+    page=$((page + 1))
 done
 
 echo "Backup completed successfully!"
- 
